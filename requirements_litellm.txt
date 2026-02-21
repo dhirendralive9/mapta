@@ -1,0 +1,9 @@
+# MAPTA LiteLLM Patch — Additional Dependencies
+# Add these to your existing requirements.txt or install directly:
+#
+#   pip install litellm
+#
+# LiteLLM handles all provider SDKs internally.
+# You only need the provider's API key set as env var.
+
+litellm>=1.61.20
