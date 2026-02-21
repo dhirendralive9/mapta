@@ -69,6 +69,22 @@ MAPTA_REASONING_EFFORT = os.getenv("MAPTA_REASONING_EFFORT", "none").lower()
 # Anthropic-specific: explicit thinking budget in tokens (min 1024)
 MAPTA_THINKING_BUDGET_TOKENS = int(os.getenv("MAPTA_THINKING_BUDGET_TOKENS", "8192"))
 
+# --- Bedrock API Key Support ---
+# For ABSK... format Bedrock API keys (bearer token auth, not IAM SigV4)
+BEDROCK_API_KEY = os.getenv("BEDROCK_API_KEY")
+
+
+def _get_bedrock_extra_headers() -> dict:
+    """Return extra headers for Bedrock API Key auth if configured.
+    
+    Bedrock API Keys (ABSK... format) authenticate via bearer token,
+    unlike standard IAM credentials which use SigV4 signing.
+    Only returns headers if BEDROCK_API_KEY env var is set.
+    """
+    if BEDROCK_API_KEY:
+        return {"Authorization": f"Bearer {BEDROCK_API_KEY}"}
+    return {}
+
 
 def _build_reasoning_kwargs(model: str) -> dict:
     """Build provider-appropriate extended thinking kwargs for litellm.acompletion().
@@ -82,12 +98,21 @@ def _build_reasoning_kwargs(model: str) -> dict:
       3. drop_params=True ensures unsupported providers silently ignore these
     """
     if MAPTA_REASONING_EFFORT == "none":
+        # Even with no reasoning, we may need Bedrock API Key headers
+        bedrock_headers = _get_bedrock_extra_headers()
+        if bedrock_headers:
+            return {"extra_headers": bedrock_headers}
         return {}
     
     kwargs = {
         "reasoning_effort": MAPTA_REASONING_EFFORT,  # Universal — LiteLLM translates per provider
         "drop_params": True,  # Silently ignore on providers that don't support it
     }
+    
+    # Add Bedrock API Key headers if configured
+    bedrock_headers = _get_bedrock_extra_headers()
+    if bedrock_headers:
+        kwargs["extra_headers"] = bedrock_headers
     
     # For Anthropic models: also pass native thinking param for precise budget control
     # reasoning_effort alone works, but thinking={} gives us token budget granularity
